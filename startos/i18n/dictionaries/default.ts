@@ -75,8 +75,8 @@ const dict = {
   'Choose the language, units, date and time formats and food search region that NutriTrace accounts start with. It fills them in for every account that has not chosen them, now and each time NutriTrace starts, and never changes a choice someone has made.': 54,
   'Regional Defaults Saved': 55,
   'NutriTrace filled in ${count} settings for accounts that had not chosen them. Accounts created later get them the next time NutriTrace starts.': 56,
-  'Fill in these defaults': 57,
-  'Turn off to stop filling them in. Settings already filled in stay as they are.': 58,
+  'Apply to accounts without their own settings': 57,
+  "When on, NutriTrace fills these in now for every account that hasn't set them itself, and for new accounts each time it starts. Turn off to stop; settings already filled in stay as they are.": 58,
   'Regional Defaults Turned Off': 59,
   'NutriTrace no longer fills in regional defaults. Settings already filled in stay as they are.': 60,
 } as const

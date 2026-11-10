@@ -1,7 +1,7 @@
 import { IMPOSSIBLE, VersionInfo } from '@start9labs/start-sdk'
 
 export const current = VersionInfo.of({
-  version: '1.4.0:1',
+  version: '1.4.0:2',
   releaseNotes: {
     en_US:
       'Adds a Set Regional Defaults action for the language, units, date and time formats and food search region that NutriTrace accounts start with. Requires StartOS 0.4.2 or later.',
