@@ -43,7 +43,9 @@ The package runs upstream's own image, unmodified, through its own entrypoint.
 Subcontainers:
 
 - `nutritrace` — the NutriTrace server (web app, API and scheduler). Attach with `start-cli package attach nutritrace -n nutritrace`.
-- `set-admin-password` — a short-lived container the **Set Admin Password** action starts from the same image; it exists only while the action runs.
+- `set-admin-password` and `set-regional-defaults` — short-lived containers the **Set Admin Password** and **Set Regional Defaults** actions start from the same image; each exists only while its action runs.
+
+Once regional defaults are set, a `regional-defaults` oneshot runs in the `nutritrace` subcontainer before the server on every start.
 
 ## Volume and Data Layout
 
@@ -65,15 +67,16 @@ The package writes no NutriTrace configuration file: upstream configures itself 
 
 `store.json` on the `startos` volume holds the package's state:
 
-| Key             | Seeded                                  | Rewritten by                           |
-| --------------- | --------------------------------------- | -------------------------------------- |
-| `jwtSecret`     | random, at install                      | never                                  |
-| `tokenEncKey`   | random, at install                      | never                                  |
-| `adminPassword` | empty until **Set Admin Password** runs | **Set Admin Password**, every run      |
-| `primaryUrl`    | empty                                   | **Set Primary URL**                    |
-| `smtp`          | `disabled`                              | **Configure SMTP**                     |
-| `apiAccess`     | `off` (`off`, `read`, `write`, `full`)  | **Configure API Access**               |
-| `foodMirror`    | `false`                                 | **Enable/Disable Local Food Database** |
+| Key                | Seeded                                  | Rewritten by                           |
+| ------------------ | --------------------------------------- | -------------------------------------- |
+| `jwtSecret`        | random, at install                      | never                                  |
+| `tokenEncKey`      | random, at install                      | never                                  |
+| `adminPassword`    | empty until **Set Admin Password** runs | **Set Admin Password**, every run      |
+| `primaryUrl`       | empty                                   | **Set Primary URL**                    |
+| `smtp`             | `disabled`                              | **Configure SMTP**                     |
+| `apiAccess`        | `off` (`off`, `read`, `write`, `full`)  | **Configure API Access**               |
+| `foodMirror`       | `false`                                 | **Enable/Disable Local Food Database** |
+| `regionalDefaults` | empty                                   | **Set Regional Defaults**              |
 
 `adminPassword` is the last password the action set. If the password is changed inside NutriTrace, the stored copy is stale; the action is the way to get a known one back.
 
@@ -175,6 +178,17 @@ Every request still needs an API token from **Settings > API Tokens** holding th
 - **Cost**: NutriTrace restarts.
 - **Repeat safety**: each run sets the level outright.
 
+### Set Regional Defaults
+
+Sets the language, units, energy unit, date and time formats, and Open Food Facts search country and language that accounts start with. NutriTrace itself has no instance-wide default: without this every account starts in English with lb, ft, in, mi and °F, MM/DD/YYYY dates, 12-hour time, kcal and worldwide food search, whatever the browser's language. The choice is stored as `regionalDefaults`; turning **Fill in these defaults** off sets it back to empty.
+
+- **What it changes**: NutriTrace's `user_settings` rows `language`, `weightUnit`, `heightUnit`, `lengthUnit`, `distUnit`, `tempUnit`, `waterUnit`, `energyUnit`, `dateFormat`, `timeFormat`, `offSearchCountry` and `offSearchLanguage`, for every account that has no value for a key or has cleared it. A value an account has saved is never overwritten. NutriTrace saves all five units the first time someone opens **Settings > Regional & Units**, so an account that has opened that page keeps the units it was shown.
+- **When it applies**: at once to existing accounts, then on every start through the `regional-defaults` oneshot, which covers accounts created since. Running the action again covers them straight away. If the oneshot fails it logs `Regional defaults not applied: …` and NutriTrace starts anyway; the action reports the same failure as an error.
+- **Cost**: a few seconds, without restarting NutriTrace. While defaults are set, each start runs the oneshot first, which takes about a second.
+- **Turning it off** stops all filling, including the oneshot, and leaves settings already filled in as they are.
+- **Repeat safety**: each run replaces the stored choice and moves every setting still holding the previous default to the new one; a value someone changed stays. An account that chose exactly the previous default moves too, since the two can't be told apart.
+- **Output**: how many settings it filled in.
+
 ### Enable / Disable Local Food Database
 
 A toggle in the **Advanced** group, off by default. Enabled, it mounts `main/off-mirror/` at `/data/off-mirror` and sets `OFF_LOCAL_DB=/data/off-mirror/off.parquet`; NutriTrace then downloads the Open Food Facts Parquet dump from Hugging Face (about 8 GB) in the background and refreshes it weekly (**Settings > Food Sources** shows its status and refresh interval). Barcode and name lookups, including the Android app's, go to the copy first and to the public API only on a miss or while the first download runs.
@@ -223,7 +237,8 @@ What works differently from a NutriTrace installed with upstream's Docker Compos
 4. The local food database's air-gapped mode (`OFF_LOCAL_ONLY`) is not offered: a product missing from the copy is looked up publicly.
 5. Trace AI cannot be pointed at a model through the server (`AI_PROVIDER`, `AI_BASE_URL`). Each user configures it in **Settings > AI Assistant**, where the browser calls the provider, so a local model has to be reachable from the browser.
 6. **Settings > Users > Disable User Management** works as upstream: it deletes every account and its data and leaves NutriTrace without sign-in.
-7. Addresses NutriTrace dials itself must not use `.local` names; see [Network Access and Interfaces](#network-access-and-interfaces).
+7. NutriTrace has no instance-wide regional defaults. **Set Regional Defaults** fills them into each account that hasn't chosen its own, and accounts created afterwards get them at the next start or the next run of the action.
+8. Addresses NutriTrace dials itself must not use `.local` names; see [Network Access and Interfaces](#network-access-and-interfaces).
 
 ---
 
@@ -235,7 +250,7 @@ The package's operable surface in one block.
 package_id: nutritrace
 image: ghcr.io/traceapps/nutritrace
 architectures: [x86_64, aarch64]
-subcontainers: [nutritrace, set-admin-password]
+subcontainers: [nutritrace, set-admin-password, set-regional-defaults]
 volumes:
   main: [/data/db, /data/uploads, /data/backups, /data/off-mirror]
   startos: none
@@ -273,6 +288,7 @@ actions:
   - set-primary-url
   - manage-smtp
   - set-api-access
+  - set-regional-defaults
   - toggle-food-mirror
 tasks:
   - { action: set-admin-password, severity: critical }

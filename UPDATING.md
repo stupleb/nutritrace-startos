@@ -35,3 +35,5 @@ gh release list -R TraceApps/nutritrace --exclude-pre-releases --limit 1
 5. Once the new build is installed, its log should open with `NutriTrace vX.Y.Z running on port 3001`.
 
 6. Run **Set Admin Password** against the new build and sign in with the result. The action imports the image's own `/app/db.js`, `bcryptjs` and `/app/lib/claim-anonymous-data.js` and writes the `users` table directly (`setAdminScript` in `startos/utils.ts`), so an upstream move or schema change there breaks it when it runs, not when it builds.
+
+7. Check that the setting keys and values **Set Regional Defaults** writes (`regionalSettings` and the option lists in `startos/utils.ts`) still match upstream's `src/stores/settings.js`, `src/routes/settings/Regional.svelte` and `src/routes/settings/ConnectedServices.svelte`. A renamed key or value is written without an error and ignored by NutriTrace.

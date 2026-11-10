@@ -3,7 +3,15 @@ import { primaryUrl } from './actions/setPrimaryUrl'
 import { storeJson } from './fileModels/store.json'
 import { i18n } from './i18n'
 import { sdk } from './sdk'
-import { dbMount, dbPath, foodMirrorSubpath, rootCaPath, uiPort } from './utils'
+import {
+  applyRegionalScript,
+  dbMount,
+  dbPath,
+  foodMirrorSubpath,
+  regionalSettings,
+  rootCaPath,
+  uiPort,
+} from './utils'
 
 export const main = sdk.setupMain(async ({ effects }) => {
   console.info(i18n('Starting NutriTrace!'))
@@ -40,6 +48,8 @@ export const main = sdk.setupMain(async ({ effects }) => {
   }
 
   const publicUrl = await primaryUrl.bestUsable(effects).const()
+  // Read once: Set Regional Defaults applies a change itself, so a change needs no restart.
+  const regional = await storeJson.read((s) => s.regionalDefaults).once()
   const apiLevel = ['off', 'read', 'write', 'full'].indexOf(store.apiAccess)
   const foodMirrorPath = `/data/${foodMirrorSubpath}`
 
@@ -74,47 +84,71 @@ export const main = sdk.setupMain(async ({ effects }) => {
   // Lets NutriTrace reach the HTTPS addresses StartOS gives other services, such as CookTrace, ntfy or Pocket ID.
   await sub.writeFile(rootCaPath, await sdk.getRootCa(effects))
 
-  return sdk.Daemons.of(effects).addDaemon('primary', {
-    subcontainer: sub,
-    exec: {
-      command: sdk.useEntrypoint(),
-      env: {
-        PORT: String(uiPort),
-        DB_PATH: dbPath,
-        UPLOADS_PATH: '/data/uploads',
-        BACKUPS_PATH: '/data/backups',
-        JWT_SECRET: store.jwtSecret,
-        TOKEN_ENC_KEY: store.tokenEncKey,
-        UPDATE_CHECK: 'off',
-        NODE_EXTRA_CA_CERTS: rootCaPath,
-        ...(publicUrl ? { PUBLIC_URL: publicUrl } : {}),
-        // Set even when off: NutriTrace keeps env-seeded SMTP values, and their lock, until an env value replaces them.
-        SMTP_HOST: smtp?.host ?? '',
-        SMTP_PORT: smtp ? String(smtp.port) : '',
-        SMTP_SECURE: String(smtp?.security === 'tls'),
-        SMTP_USER: smtp?.username ?? '',
-        SMTP_PASS: smtp?.password ?? '',
-        SMTP_FROM: smtp?.from ?? '',
-        WEBHOOKS_ENABLED: 'true',
-        ALLOW_PRIVATE_WEBHOOK_URLS: 'true',
-        MCP_ENABLED: String(apiLevel > 0),
-        PUBLIC_API_ENABLED: String(apiLevel > 0),
-        MCP_WRITE_ENABLED: String(apiLevel > 1),
-        PUBLIC_API_WRITE_ENABLED: String(apiLevel > 1),
-        MCP_DESTROY_ENABLED: String(apiLevel > 2),
-        ...(store.foodMirror
-          ? { OFF_LOCAL_DB: `${foodMirrorPath}/off.parquet` }
-          : {}),
+  return sdk.Daemons.of(effects)
+    .addOneshot('regional-defaults', () =>
+      regional
+        ? {
+            subcontainer: sub,
+            exec: {
+              command: [
+                'node',
+                '--input-type=module',
+                '-e',
+                applyRegionalScript,
+              ],
+              cwd: '/app',
+              env: {
+                DB_PATH: dbPath,
+                SETTINGS: JSON.stringify(regionalSettings(regional)),
+                // A failure is logged, never allowed to stop NutriTrace starting.
+                BEST_EFFORT: '1',
+              },
+            },
+            requires: [],
+          }
+        : null,
+    )
+    .addDaemon('primary', {
+      subcontainer: sub,
+      exec: {
+        command: sdk.useEntrypoint(),
+        env: {
+          PORT: String(uiPort),
+          DB_PATH: dbPath,
+          UPLOADS_PATH: '/data/uploads',
+          BACKUPS_PATH: '/data/backups',
+          JWT_SECRET: store.jwtSecret,
+          TOKEN_ENC_KEY: store.tokenEncKey,
+          UPDATE_CHECK: 'off',
+          NODE_EXTRA_CA_CERTS: rootCaPath,
+          ...(publicUrl ? { PUBLIC_URL: publicUrl } : {}),
+          // Set even when off: NutriTrace keeps env-seeded SMTP values, and their lock, until an env value replaces them.
+          SMTP_HOST: smtp?.host ?? '',
+          SMTP_PORT: smtp ? String(smtp.port) : '',
+          SMTP_SECURE: String(smtp?.security === 'tls'),
+          SMTP_USER: smtp?.username ?? '',
+          SMTP_PASS: smtp?.password ?? '',
+          SMTP_FROM: smtp?.from ?? '',
+          WEBHOOKS_ENABLED: 'true',
+          ALLOW_PRIVATE_WEBHOOK_URLS: 'true',
+          MCP_ENABLED: String(apiLevel > 0),
+          PUBLIC_API_ENABLED: String(apiLevel > 0),
+          MCP_WRITE_ENABLED: String(apiLevel > 1),
+          PUBLIC_API_WRITE_ENABLED: String(apiLevel > 1),
+          MCP_DESTROY_ENABLED: String(apiLevel > 2),
+          ...(store.foodMirror
+            ? { OFF_LOCAL_DB: `${foodMirrorPath}/off.parquet` }
+            : {}),
+        },
       },
-    },
-    ready: {
-      display: i18n('Web Interface'),
-      fn: () =>
-        sdk.healthCheck.checkWebUrl(effects, `http://127.0.0.1:${uiPort}/`, {
-          successMessage: i18n('The web interface is ready'),
-          errorMessage: i18n('The web interface is not ready'),
-        }),
-    },
-    requires: [],
-  })
+      ready: {
+        display: i18n('Web Interface'),
+        fn: () =>
+          sdk.healthCheck.checkWebUrl(effects, `http://127.0.0.1:${uiPort}/`, {
+            successMessage: i18n('The web interface is ready'),
+            errorMessage: i18n('The web interface is not ready'),
+          }),
+      },
+      requires: regional ? ['regional-defaults'] : [],
+    })
 })
