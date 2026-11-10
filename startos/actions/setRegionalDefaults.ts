@@ -16,9 +16,9 @@ const { InputSpec, Value } = sdk
 
 const inputSpec = InputSpec.of({
   fill: Value.toggle({
-    name: i18n('Fill in these defaults'),
+    name: i18n('Apply to accounts without their own settings'),
     description: i18n(
-      'Turn off to stop filling them in. Settings already filled in stay as they are.',
+      "When on, NutriTrace fills these in now for every account that hasn't set them itself, and for new accounts each time it starts. Turn off to stop; settings already filled in stay as they are.",
     ),
     default: true,
   }),

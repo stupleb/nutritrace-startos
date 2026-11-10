@@ -35,7 +35,7 @@ Run **Set Admin Password** again whenever you need a new admin password, for ins
 
 ### Regional defaults
 
-**Set Regional Defaults** fills in the language, units, date and time formats and food search country for every account that hasn't chosen its own. Each person can still change theirs in **Settings > Regional & Units** and **Settings > Food Sources**. Accounts you add later get the defaults the next time NutriTrace starts, or straight away if you run the action again. To stop, run it with **Fill in these defaults** turned off; settings already filled in stay as they are.
+**Set Regional Defaults** fills in the language, units, date and time formats and food search country for every account that hasn't chosen its own. Each person can still change theirs in **Settings > Regional & Units** and **Settings > Food Sources**. Accounts you add later get the defaults the next time NutriTrace starts, or straight away if you run the action again. To stop, run it with **Apply to accounts without their own settings** turned off; settings already filled in stay as they are.
 
 ### Email and links
 
