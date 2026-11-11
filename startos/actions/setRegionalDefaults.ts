@@ -2,13 +2,13 @@ import { storeJson } from '../fileModels/store.json'
 import { i18n } from '../i18n'
 import { sdk } from '../sdk'
 import {
-  applyRegionalScript,
   dbMount,
   dbPath,
   foodCountries,
   foodLanguages,
   nutritraceDefaults,
   regionalSettings,
+  regionalTriggerScript,
   uiLanguages,
 } from '../utils'
 
@@ -16,9 +16,9 @@ const { InputSpec, Value } = sdk
 
 const inputSpec = InputSpec.of({
   fill: Value.toggle({
-    name: i18n('Apply to accounts without their own settings'),
+    name: i18n('Use for new accounts'),
     description: i18n(
-      "When on, NutriTrace fills these in now for every account that hasn't set them itself, and for new accounts each time it starts. Turn off to stop; settings already filled in stay as they are.",
+      "When on, every account created from now on starts with these settings. Turn off to give new accounts NutriTrace's own defaults again. Existing accounts are never changed.",
     ),
     default: true,
   }),
@@ -95,7 +95,7 @@ export const setRegionalDefaults = sdk.Action.withInput(
   async ({ effects }) => ({
     name: i18n('Set Regional Defaults'),
     description: i18n(
-      'Choose the language, units, date and time formats and food search region that NutriTrace accounts start with. It fills them in for every account that has not chosen them, now and each time NutriTrace starts, and never changes a choice someone has made.',
+      'Choose the language, units, date and time formats and food search region that new NutriTrace accounts start with. An account gets them the moment it is created; existing accounts keep their settings.',
     ),
     warning: null,
     allowedStatuses: 'any',
@@ -113,49 +113,44 @@ export const setRegionalDefaults = sdk.Action.withInput(
   },
 
   async ({ effects, input: { fill, ...defaults } }) => {
-    if (!fill) {
-      await storeJson.merge(effects, { regionalDefaults: null })
-      return {
-        version: '1',
-        title: i18n('Regional Defaults Turned Off'),
-        message: i18n(
-          'NutriTrace no longer fills in regional defaults. Settings already filled in stay as they are.',
-        ),
-        result: null,
-      }
-    }
-    const previous = await storeJson.read((s) => s.regionalDefaults).once()
-    const { stdout } = await sdk.SubContainer.withTemp(
+    await sdk.SubContainer.withTemp(
       effects,
       { imageId: 'nutritrace' },
       dbMount,
       'set-regional-defaults',
       (sub) =>
         sub.execFail(
-          ['node', '--input-type=module', '-e', applyRegionalScript],
+          ['node', '--input-type=module', '-e', regionalTriggerScript],
           {
             cwd: '/app',
             env: {
               DB_PATH: dbPath,
-              SETTINGS: JSON.stringify(regionalSettings(defaults)),
-              PREVIOUS: JSON.stringify(
-                previous ? regionalSettings(previous) : {},
-              ),
+              ...(fill
+                ? { SETTINGS: JSON.stringify(regionalSettings(defaults)) }
+                : {}),
             },
             timeout: 60_000,
           },
         ),
     )
-    await storeJson.merge(effects, { regionalDefaults: defaults })
+    await storeJson.merge(effects, { regionalDefaults: fill ? defaults : null })
 
-    return {
-      version: '1',
-      title: i18n('Regional Defaults Saved'),
-      message: i18n(
-        'NutriTrace filled in ${count} settings for accounts that had not chosen them. Accounts created later get them the next time NutriTrace starts.',
-        { count: Number(String(stdout).match(/\d+/)?.[0] ?? 0) },
-      ),
-      result: null,
-    }
+    return fill
+      ? {
+          version: '1',
+          title: i18n('Regional Defaults Saved'),
+          message: i18n(
+            'New accounts start with these settings from now on. Existing accounts keep theirs.',
+          ),
+          result: null,
+        }
+      : {
+          version: '1',
+          title: i18n('Regional Defaults Turned Off'),
+          message: i18n(
+            "New accounts start with NutriTrace's own defaults again. Existing accounts keep their settings.",
+          ),
+          result: null,
+        }
   },
 )

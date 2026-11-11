@@ -72,13 +72,13 @@ const dict = {
   'Food search language': 51,
   'Open Food Facts searches show products in this language, with their names in it where available.': 52,
   'Set Regional Defaults': 53,
-  'Choose the language, units, date and time formats and food search region that NutriTrace accounts start with. It fills them in for every account that has not chosen them, now and each time NutriTrace starts, and never changes a choice someone has made.': 54,
+  'Choose the language, units, date and time formats and food search region that new NutriTrace accounts start with. An account gets them the moment it is created; existing accounts keep their settings.': 54,
   'Regional Defaults Saved': 55,
-  'NutriTrace filled in ${count} settings for accounts that had not chosen them. Accounts created later get them the next time NutriTrace starts.': 56,
-  'Apply to accounts without their own settings': 57,
-  "When on, NutriTrace fills these in now for every account that hasn't set them itself, and for new accounts each time it starts. Turn off to stop; settings already filled in stay as they are.": 58,
+  'New accounts start with these settings from now on. Existing accounts keep theirs.': 56,
+  'Use for new accounts': 57,
+  "When on, every account created from now on starts with these settings. Turn off to give new accounts NutriTrace's own defaults again. Existing accounts are never changed.": 58,
   'Regional Defaults Turned Off': 59,
-  'NutriTrace no longer fills in regional defaults. Settings already filled in stay as they are.': 60,
+  "New accounts start with NutriTrace's own defaults again. Existing accounts keep their settings.": 60,
 } as const
 
 /**

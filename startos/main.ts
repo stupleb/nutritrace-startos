@@ -4,11 +4,11 @@ import { storeJson } from './fileModels/store.json'
 import { i18n } from './i18n'
 import { sdk } from './sdk'
 import {
-  applyRegionalScript,
   dbMount,
   dbPath,
   foodMirrorSubpath,
   regionalSettings,
+  regionalTriggerScript,
   rootCaPath,
   uiPort,
 } from './utils'
@@ -84,6 +84,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
   // Lets NutriTrace reach the HTTPS addresses StartOS gives other services, such as CookTrace, ntfy or Pocket ID.
   await sub.writeFile(rootCaPath, await sdk.getRootCa(effects))
 
+  // regional-defaults runs on every start: a NutriTrace migration can rebuild the users table, which drops the trigger.
   return sdk.Daemons.of(effects)
     .addOneshot('regional-defaults', () =>
       regional
@@ -94,7 +95,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
                 'node',
                 '--input-type=module',
                 '-e',
-                applyRegionalScript,
+                regionalTriggerScript,
               ],
               cwd: '/app',
               env: {
